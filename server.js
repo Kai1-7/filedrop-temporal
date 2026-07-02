@@ -19,7 +19,9 @@ const PUBLIC_ORIGIN_PATH = path.join(APP_DIR, "public-origin.txt");
 
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || "0.0.0.0";
-const EXPIRY_MS = Number(process.env.FILEDROP_TTL_MS || 60 * 60 * 1000);
+const MIN_TTL_MS = 60 * 1000;
+const MAX_TTL_MS = Math.max(MIN_TTL_MS, Number(process.env.FILEDROP_MAX_TTL_MS || 24 * 60 * 60 * 1000));
+const DEFAULT_TTL_MS = clampTtl(Number(process.env.FILEDROP_TTL_MS || 60 * 60 * 1000));
 const MAX_BYTES = parseByteSize(process.env.FILEDROP_MAX_SIZE || "5gb");
 
 const MIME_TYPES = {
@@ -61,7 +63,11 @@ const server = http.createServer(async (req, res) => {
 
     if (route === "/api/info" && req.method === "GET") {
       sendJson(req, res, 200, {
-        ttlMs: EXPIRY_MS,
+        ttlMs: DEFAULT_TTL_MS,
+        defaultTtlMs: DEFAULT_TTL_MS,
+        minTtlMs: MIN_TTL_MS,
+        maxTtlMs: MAX_TTL_MS,
+        maxTtlText: formatDurationLabel(MAX_TTL_MS),
         maxBytes: MAX_BYTES,
         maxSizeText: formatBytes(MAX_BYTES),
         publicOrigin: readPublicOrigin(),
@@ -166,7 +172,8 @@ server.listen(PORT, HOST, () => {
   console.log("");
   console.log("FileDrop temporal listo");
   console.log(`Codigo privado para subir: ${uploadCode}`);
-  console.log(`Tiempo de vida de cada archivo: ${Math.round(EXPIRY_MS / 60000)} minutos`);
+  console.log(`Tiempo por defecto de cada archivo: ${formatDurationLabel(DEFAULT_TTL_MS)}`);
+  console.log(`Tiempo maximo configurable: ${formatDurationLabel(MAX_TTL_MS)}`);
   console.log(`Tamano maximo por archivo: ${formatBytes(MAX_BYTES)}`);
   console.log("");
   console.log("Abre la app en:");
@@ -176,6 +183,13 @@ server.listen(PORT, HOST, () => {
 
 async function handleUpload(req, res) {
   if (!requireUploadCode(req, res)) return;
+
+  const ttlMs = resolveUploadTtl(req.headers["x-file-ttl-ms"]);
+  if (ttlMs instanceof Error) {
+    sendJson(req, res, ttlMs.statusCode || 400, { error: ttlMs.message });
+    req.destroy();
+    return;
+  }
 
   const contentLength = Number(req.headers["content-length"] || 0);
   if (Number.isFinite(contentLength) && contentLength > MAX_BYTES) {
@@ -226,7 +240,8 @@ async function handleUpload(req, res) {
     mime,
     storedName,
     uploadedAt: now,
-    expiresAt: now + EXPIRY_MS,
+    expiresAt: now + ttlMs,
+    ttlMs,
     downloadCount: 0,
     lastDownloadedAt: null,
   };
@@ -389,9 +404,40 @@ function publicTransfer(transfer) {
     mime: transfer.mime,
     uploadedAt: transfer.uploadedAt,
     expiresAt: transfer.expiresAt,
+    ttlMs: transfer.ttlMs || Math.max(0, transfer.expiresAt - transfer.uploadedAt),
     downloadCount: transfer.downloadCount || 0,
     lastDownloadedAt: transfer.lastDownloadedAt || null,
   };
+}
+
+function resolveUploadTtl(value) {
+  if (value === undefined || value === null || value === "") return DEFAULT_TTL_MS;
+
+  const ttlMs = Number(value);
+  if (!Number.isFinite(ttlMs)) {
+    const error = new Error("El tiempo del link no es valido.");
+    error.statusCode = 400;
+    return error;
+  }
+
+  if (ttlMs < MIN_TTL_MS) {
+    const error = new Error(`El tiempo minimo del link es ${formatDurationLabel(MIN_TTL_MS)}.`);
+    error.statusCode = 400;
+    return error;
+  }
+
+  if (ttlMs > MAX_TTL_MS) {
+    const error = new Error(`El tiempo maximo del link es ${formatDurationLabel(MAX_TTL_MS)}.`);
+    error.statusCode = 400;
+    return error;
+  }
+
+  return Math.round(ttlMs);
+}
+
+function clampTtl(value) {
+  if (!Number.isFinite(value)) return 60 * 60 * 1000;
+  return Math.max(MIN_TTL_MS, Math.min(Math.round(value), MAX_TTL_MS));
 }
 
 function requireUploadCode(req, res) {
@@ -580,4 +626,17 @@ function formatBytes(bytes) {
     unit += 1;
   }
   return `${value >= 10 || unit === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unit]}`;
+}
+
+function formatDurationLabel(ms) {
+  const totalMinutes = Math.max(1, Math.round(ms / 60000));
+  if (totalMinutes < 60) {
+    return `${totalMinutes} ${totalMinutes === 1 ? "minuto" : "minutos"}`;
+  }
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const hourText = `${hours} ${hours === 1 ? "hora" : "horas"}`;
+  if (!minutes) return hourText;
+  return `${hourText} ${minutes} min`;
 }

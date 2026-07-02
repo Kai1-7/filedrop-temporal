@@ -6,6 +6,7 @@ const state = {
   selectedFile: null,
   transfers: [],
   downloadTransfer: null,
+  durationInitialized: false,
 };
 
 const els = {
@@ -16,9 +17,13 @@ const els = {
   codeForm: document.querySelector("#codeForm"),
   codeInput: document.querySelector("#codeInput"),
   codeError: document.querySelector("#codeError"),
+  durationPill: document.querySelector("#durationPill"),
   logoutButton: document.querySelector("#logoutButton"),
   fileInput: document.querySelector("#fileInput"),
   dropZone: document.querySelector("#dropZone"),
+  durationSelect: document.querySelector("#durationSelect"),
+  customDurationWrap: document.querySelector("#customDurationWrap"),
+  customDurationInput: document.querySelector("#customDurationInput"),
   chooseButton: document.querySelector("#chooseButton"),
   uploadButton: document.querySelector("#uploadButton"),
   fileName: document.querySelector("#fileName"),
@@ -80,6 +85,8 @@ function setupAdminEvents() {
   els.chooseButton.addEventListener("click", () => els.fileInput.click());
   els.dropZone.addEventListener("click", () => els.fileInput.click());
   els.fileInput.addEventListener("change", () => selectFile(els.fileInput.files[0]));
+  els.durationSelect.addEventListener("change", renderDurationControls);
+  els.customDurationInput.addEventListener("input", renderDurationControls);
   els.uploadButton.addEventListener("click", uploadSelectedFile);
   els.refreshButton.addEventListener("click", refreshTransfers);
   els.copyButton.addEventListener("click", () => copyText(els.shareLink.value, els.resultNote));
@@ -155,10 +162,20 @@ function uploadSelectedFile() {
   setStatus(els.uploadStatus, "");
 
   const startedAt = performance.now();
+  const ttlMs = getSelectedTtlMs();
+  if (!ttlMs) {
+    setStatus(els.uploadStatus, "Elige una duracion valida para el link.", true);
+    els.uploadButton.disabled = false;
+    els.chooseButton.disabled = false;
+    els.progressPanel.hidden = true;
+    return;
+  }
+
   const xhr = new XMLHttpRequest();
   xhr.open("POST", "/api/uploads");
   xhr.setRequestHeader("X-Upload-Code", state.code);
   xhr.setRequestHeader("X-File-Name", encodeURIComponent(file.name));
+  xhr.setRequestHeader("X-File-Ttl-Ms", String(ttlMs));
   xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
 
   xhr.upload.addEventListener("progress", (event) => {
@@ -191,8 +208,8 @@ function uploadSelectedFile() {
     els.resultPanel.hidden = false;
     setProgress(100, "Subida completa");
     setStatus(els.uploadStatus, "Link listo. Se borrara automaticamente al vencer.");
-    setStatus(els.resultNote, "Disponible durante 1 hora desde la subida.");
-    await copyText(shareUrl, els.resultNote, true);
+    setStatus(els.resultNote, `Disponible durante ${formatDurationLabel(data.transfer.ttlMs || ttlMs)} desde la subida.`);
+    await copyText(shareUrl, els.uploadStatus, true);
     await refreshTransfers();
   });
 
@@ -311,6 +328,8 @@ async function deleteTransfer(id) {
 function renderInfo() {
   if (!state.info) return;
   els.fileMeta.textContent = `Maximo permitido: ${state.info.maxSizeText}`;
+  initializeDurationFromInfo();
+  renderDurationControls();
 
   const publicOrigin = state.info.publicOrigin;
   const lan = (state.info.localOrigins || [])
@@ -327,6 +346,42 @@ function renderInfo() {
     ${publicOrigin ? `<a href="${publicOrigin}" target="_blank" rel="noreferrer">${publicOrigin}</a>` : ""}
     ${lan.slice(0, 3).map((origin) => `<a href="${origin}" target="_blank" rel="noreferrer">${origin}</a>`).join("")}
   `;
+}
+
+function initializeDurationFromInfo() {
+  if (state.durationInitialized || !state.info) return;
+  state.durationInitialized = true;
+
+  const defaultTtl = String(state.info.defaultTtlMs || state.info.ttlMs || 3600000);
+  const option = [...els.durationSelect.options].find((item) => item.value === defaultTtl);
+  if (option) {
+    els.durationSelect.value = defaultTtl;
+    return;
+  }
+
+  els.durationSelect.value = "custom";
+  els.customDurationInput.value = String(Math.max(1, Math.round(Number(defaultTtl) / 60000)));
+}
+
+function renderDurationControls() {
+  const custom = els.durationSelect.value === "custom";
+  els.customDurationWrap.hidden = !custom;
+
+  if (state.info) {
+    const maxMinutes = Math.max(1, Math.floor(state.info.maxTtlMs / 60000));
+    els.customDurationInput.max = String(maxMinutes);
+  }
+
+  const ttlMs = getSelectedTtlMs();
+  const label = ttlMs ? formatDurationLabel(ttlMs) : "Tiempo invalido";
+  els.durationPill.textContent = label;
+
+  const maxTtl = state.info ? state.info.maxTtlMs : Infinity;
+  if (ttlMs && ttlMs > maxTtl) {
+    setStatus(els.uploadStatus, `El maximo permitido es ${formatDurationLabel(maxTtl)}.`, true);
+  } else if (els.uploadStatus.classList.contains("error") && els.uploadStatus.textContent.includes("maximo permitido")) {
+    setStatus(els.uploadStatus, "");
+  }
 }
 
 function updateTimers() {
@@ -375,6 +430,20 @@ function bestShareUrl(currentUrl, id) {
   return lanOrigin ? `${lanOrigin}/d/${id}` : currentUrl;
 }
 
+function getSelectedTtlMs() {
+  const rawValue = els.durationSelect.value;
+  const ttlMs = rawValue === "custom"
+    ? Number(els.customDurationInput.value) * 60 * 1000
+    : Number(rawValue);
+
+  if (!Number.isFinite(ttlMs) || ttlMs <= 0) return null;
+
+  const minTtl = state.info ? state.info.minTtlMs : 60 * 1000;
+  const maxTtl = state.info ? state.info.maxTtlMs : 24 * 60 * 60 * 1000;
+  if (ttlMs < minTtl || ttlMs > maxTtl) return null;
+  return Math.round(ttlMs);
+}
+
 function isLocalLikeHost(host) {
   return host === "localhost" || host === "127.0.0.1" || isPrivateLanHost(host);
 }
@@ -412,7 +481,9 @@ function timeLeft(expiresAt) {
   const ms = Math.max(0, Number(expiresAt) - Date.now());
   if (ms <= 0) return "Expirado";
   const totalSeconds = Math.ceil(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  if (hours > 0) return `${hours}h ${minutes}m`;
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
@@ -423,6 +494,16 @@ function formatDuration(seconds) {
   const minutes = Math.floor(seconds / 60);
   const rest = Math.ceil(seconds % 60);
   return `${minutes}m ${rest}s`;
+}
+
+function formatDurationLabel(ms) {
+  const totalMinutes = Math.max(1, Math.round(Number(ms) / 60000));
+  if (totalMinutes < 60) return `${totalMinutes} ${totalMinutes === 1 ? "minuto" : "minutos"}`;
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const hourText = `${hours} ${hours === 1 ? "hora" : "horas"}`;
+  return minutes ? `${hourText} ${minutes} min` : hourText;
 }
 
 function formatBytes(bytes) {

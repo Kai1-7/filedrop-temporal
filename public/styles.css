@@ -47,6 +47,7 @@ body {
 
 button,
 input,
+select,
 a {
   font: inherit;
 }
@@ -162,7 +163,8 @@ label {
   gap: 10px;
 }
 
-input {
+input,
+select {
   width: 100%;
   min-width: 0;
   height: 48px;
@@ -175,6 +177,11 @@ input {
 }
 
 input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+select:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
 }
@@ -259,6 +266,18 @@ button:disabled {
 .dropzone.dragging {
   border-color: var(--primary);
   background: color-mix(in srgb, var(--primary) 10%, var(--panel-2));
+}
+
+.duration-box {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 170px;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.duration-box label {
+  display: inline-block;
+  margin-bottom: 7px;
 }
 
 .actions {
@@ -460,6 +479,7 @@ dd {
   .topbar,
   .panel-head,
   .inline,
+  .duration-box,
   .facts {
     flex-direction: column;
     grid-template-columns: 1fr;

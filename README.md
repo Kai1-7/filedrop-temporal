@@ -10,7 +10,8 @@ FileDrop Temporal is useful when you occasionally need to send a big APK, ZIP, v
 
 - Local storage on your PC.
 - Temporary download links.
-- 1-hour automatic cleanup.
+- Per-file expiration times.
+- Automatic cleanup when links expire.
 - Private upload code.
 - Responsive browser interface.
 - Optional Electron desktop shell.
@@ -67,6 +68,8 @@ https://example.trycloudflare.com/d/transfer-id
 
 Keep the terminal open while your friend downloads. If your PC sleeps, shuts down, or loses internet, the link stops working.
 
+Each upload can choose its own expiration time from the web UI. The default is 1 hour and the default maximum is 24 hours.
+
 ## Desktop App
 
 Run the Electron prototype:
@@ -96,6 +99,7 @@ $env:PORT=8788
 $env:FILEDROP_CODE="MY-CODE"
 $env:FILEDROP_MAX_SIZE="10gb"
 $env:FILEDROP_TTL_MS="3600000"
+$env:FILEDROP_MAX_TTL_MS="86400000"
 ```
 
 ## Security Notes
