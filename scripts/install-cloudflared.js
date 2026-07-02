@@ -63,7 +63,7 @@ async function main() {
 
   console.log("");
   console.log("Listo. Ahora puedes correr:");
-  console.log("  npm run filedrop:tunnel");
+  console.log("  npm run tunnel");
   await printVersion();
 }
 
