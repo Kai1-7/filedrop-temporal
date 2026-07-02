@@ -1,0 +1,8 @@
+node_modules/
+.upload-code
+public-origin.txt
+bin/
+storage/*
+!storage/.gitignore
+*.log
+*.tmp

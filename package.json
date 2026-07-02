@@ -1,0 +1,25 @@
+{
+  "name": "filedrop-temporal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Share large files from your PC through temporary public links.",
+  "main": "desktop/main.js",
+  "scripts": {
+    "start": "node server.js",
+    "desktop": "electron desktop/main.js",
+    "setup-tunnel": "node scripts/install-cloudflared.js",
+    "tunnel": "node scripts/start-tunnel.js",
+    "upload": "node scripts/upload-local.js"
+  },
+  "keywords": [
+    "file-sharing",
+    "temporary-links",
+    "cloudflare-tunnel",
+    "electron"
+  ],
+  "author": "Ka1-7",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^43.0.0"
+  }
+}
