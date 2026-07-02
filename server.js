@@ -234,7 +234,7 @@ async function handleUpload(req, res) {
   transfers.set(id, transfer);
   await saveTransfers();
 
-  const origin = currentOrigin(req);
+  const origin = readPublicOrigin() || currentOrigin(req);
   sendJson(req, res, 201, {
     transfer: publicTransfer(transfer),
     shareUrl: `${origin}/d/${id}`,

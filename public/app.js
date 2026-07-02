@@ -185,6 +185,7 @@ function uploadSelectedFile() {
       return;
     }
 
+    state.info = await getInfo();
     const shareUrl = bestShareUrl(data.shareUrl, data.transfer.id);
     els.shareLink.value = shareUrl;
     els.resultPanel.hidden = false;
@@ -356,7 +357,7 @@ function getDownloadId() {
 
 function bestShareUrl(currentUrl, id) {
   if (!state.info) return currentUrl;
-  if (state.info.publicOrigin && isLocalLikeHost(location.hostname)) {
+  if (state.info.publicOrigin) {
     return `${state.info.publicOrigin}/d/${id}`;
   }
   if (!/^localhost$|^127\.0\.0\.1$/.test(location.hostname)) return currentUrl;
