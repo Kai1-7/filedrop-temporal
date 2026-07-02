@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f6f7f4">
+  <title>Entrega temporal</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <section id="adminView" class="view" hidden>
+      <header class="topbar">
+        <div>
+          <p class="kicker">FileDrop privado</p>
+          <h1>Entrega temporal</h1>
+        </div>
+        <span class="pill">1 hora</span>
+      </header>
+
+      <section id="lockPanel" class="panel narrow">
+        <form id="codeForm" class="stack">
+          <label for="codeInput">Codigo privado</label>
+          <div class="inline">
+            <input id="codeInput" name="code" type="password" autocomplete="current-password" placeholder="XXXX-XXXX" required>
+            <button type="submit">Entrar</button>
+          </div>
+          <p id="codeError" class="status error" role="alert"></p>
+        </form>
+      </section>
+
+      <section id="uploadPanel" class="workspace" hidden>
+        <div class="panel upload-panel">
+          <div class="panel-head">
+            <div>
+              <p class="kicker">Subida</p>
+              <h2>Archivo temporal</h2>
+            </div>
+            <button id="logoutButton" class="ghost" type="button">Cerrar</button>
+          </div>
+
+          <input id="fileInput" type="file" hidden>
+          <button id="dropZone" class="dropzone" type="button">
+            <strong id="fileName">Seleccionar archivo</strong>
+            <span id="fileMeta">Maximo permitido: cargando...</span>
+          </button>
+
+          <div class="actions">
+            <button id="chooseButton" class="secondary" type="button">Buscar archivo</button>
+            <button id="uploadButton" type="button" disabled>Subir y crear link</button>
+          </div>
+
+          <div id="progressPanel" class="progress-panel" hidden>
+            <div class="meter"><span id="progressBar"></span></div>
+            <div class="progress-line">
+              <span id="progressText">0%</span>
+              <span id="speedText">Preparando...</span>
+            </div>
+          </div>
+
+          <div id="resultPanel" class="result" hidden>
+            <label for="shareLink">Link generado</label>
+            <div class="inline">
+              <input id="shareLink" readonly>
+              <button id="copyButton" type="button">Copiar</button>
+            </div>
+            <p id="resultNote" class="status"></p>
+          </div>
+
+          <p id="uploadStatus" class="status" role="status"></p>
+        </div>
+
+        <aside class="panel side-panel">
+          <div class="panel-head">
+            <div>
+              <p class="kicker">Vigentes</p>
+              <h2>Links activos</h2>
+            </div>
+            <button id="refreshButton" class="ghost" type="button">Actualizar</button>
+          </div>
+          <div id="transferList" class="transfer-list"></div>
+          <div id="networkHints" class="network"></div>
+        </aside>
+      </section>
+    </section>
+
+    <section id="downloadView" class="view download-view" hidden>
+      <article class="panel download-panel">
+        <p class="kicker">Archivo compartido</p>
+        <h1 id="downloadTitle">Preparando descarga</h1>
+        <dl class="facts">
+          <div>
+            <dt>Tamano</dt>
+            <dd id="downloadSize">...</dd>
+          </div>
+          <div>
+            <dt>Disponible</dt>
+            <dd id="downloadTime">...</dd>
+          </div>
+        </dl>
+        <a id="downloadButton" class="download-button" href="#" hidden>Descargar archivo</a>
+        <p id="downloadStatus" class="status" role="status"></p>
+      </article>
+    </section>
+  </main>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>
