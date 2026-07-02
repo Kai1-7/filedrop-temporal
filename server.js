@@ -22,7 +22,8 @@ const HOST = process.env.HOST || "0.0.0.0";
 const MIN_TTL_MS = 60 * 1000;
 const MAX_TTL_MS = Math.max(MIN_TTL_MS, Number(process.env.FILEDROP_MAX_TTL_MS || 24 * 60 * 60 * 1000));
 const DEFAULT_TTL_MS = clampTtl(Number(process.env.FILEDROP_TTL_MS || 60 * 60 * 1000));
-const MAX_BYTES = parseByteSize(process.env.FILEDROP_MAX_SIZE || "5gb");
+const DEFAULT_MAX_SIZE = "25gb";
+const MAX_BYTES = parseByteSize(process.env.FILEDROP_MAX_SIZE || DEFAULT_MAX_SIZE);
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",

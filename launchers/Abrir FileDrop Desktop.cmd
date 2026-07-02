@@ -9,6 +9,7 @@ echo   FileDrop Desktop
 echo ==========================================
 echo.
 
+set FILEDROP_MAX_SIZE=25gb
 npm run desktop
 
 echo.

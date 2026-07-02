@@ -70,6 +70,8 @@ Keep the terminal open while your friend downloads. If your PC sleeps, shuts dow
 
 Each upload can choose its own expiration time from the web UI. The default is 1 hour and the default maximum is 24 hours.
 
+The default max file size is 25 GB. Real transfers still depend on your free disk space, connection speed, and how long your PC stays awake.
+
 ## Desktop App
 
 Run the Electron prototype:
@@ -97,7 +99,7 @@ Environment variables:
 ```powershell
 $env:PORT=8788
 $env:FILEDROP_CODE="MY-CODE"
-$env:FILEDROP_MAX_SIZE="10gb"
+$env:FILEDROP_MAX_SIZE="50gb"
 $env:FILEDROP_TTL_MS="3600000"
 $env:FILEDROP_MAX_TTL_MS="86400000"
 ```
