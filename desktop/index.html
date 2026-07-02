@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FileDrop Temporal</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="app">
+    <aside class="rail">
+      <div>
+        <p class="eyebrow">FileDrop</p>
+        <h1>Temporal</h1>
+      </div>
+
+      <div class="status-stack">
+        <div class="metric">
+          <span>Servidor</span>
+          <strong id="serverState">Apagado</strong>
+        </div>
+        <div class="metric">
+          <span>Tunel</span>
+          <strong id="tunnelState">Apagado</strong>
+        </div>
+        <div class="metric">
+          <span>Expira</span>
+          <strong>1 hora</strong>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="startButton" type="button">Encender</button>
+        <button id="stopButton" class="secondary danger" type="button">Apagar</button>
+      </div>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Panel local</p>
+          <h2>Compartir archivo</h2>
+        </div>
+        <button id="openButton" class="secondary" type="button">Abrir navegador</button>
+      </header>
+
+      <section class="share-panel">
+        <label for="publicUrl">Link publico</label>
+        <div class="url-row">
+          <input id="publicUrl" value="Sin tunel activo" readonly>
+          <button id="copyButton" type="button">Copiar</button>
+        </div>
+      </section>
+
+      <section class="uploader-shell">
+        <iframe id="uploaderFrame" title="FileDrop uploader"></iframe>
+        <div id="emptyState" class="empty-state">
+          <strong>FileDrop esta apagado</strong>
+          <span>Panel de subida en espera.</span>
+        </div>
+      </section>
+    </section>
+
+    <aside class="log-panel">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Actividad</p>
+          <h2>Registro</h2>
+        </div>
+        <button id="clearButton" class="ghost" type="button">Limpiar</button>
+      </div>
+      <pre id="logs"></pre>
+    </aside>
+  </main>
+
+  <script src="./renderer.js"></script>
+</body>
+</html>

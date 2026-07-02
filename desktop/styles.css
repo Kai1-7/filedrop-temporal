@@ -1,0 +1,267 @@
+:root {
+  color-scheme: light;
+  --bg: #f4f5ef;
+  --panel: #ffffff;
+  --soft: #eef2ec;
+  --ink: #18221d;
+  --muted: #69766d;
+  --line: #d8dfd6;
+  --primary: #0f7a53;
+  --primary-strong: #0b5f40;
+  --blue: #2f6fc6;
+  --danger: #b33d33;
+  --shadow: 0 16px 40px rgba(24, 34, 29, .10);
+  --radius: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Aptos, "Segoe UI", system-ui, sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr) 330px;
+  gap: 14px;
+  height: 100vh;
+  padding: 14px;
+}
+
+.rail,
+.workspace,
+.log-panel,
+.share-panel,
+.uploader-shell {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.rail,
+.workspace,
+.log-panel {
+  min-height: 0;
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 20px;
+}
+
+.workspace {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px;
+}
+
+.log-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: 16px;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 42px;
+  line-height: .95;
+  letter-spacing: 0;
+}
+
+h2 {
+  font-size: 22px;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+.eyebrow {
+  margin-bottom: 7px;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.status-stack,
+.actions {
+  display: grid;
+  gap: 10px;
+}
+
+.metric {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--soft);
+  padding: 12px;
+}
+
+.metric span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.metric strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 22px;
+}
+
+.topbar,
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+button {
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--primary);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 850;
+  padding: 0 16px;
+}
+
+button:hover {
+  background: var(--primary-strong);
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: .58;
+}
+
+.secondary {
+  background: var(--blue);
+}
+
+.danger {
+  background: var(--danger);
+}
+
+.ghost {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+}
+
+.ghost:hover {
+  background: var(--soft);
+}
+
+.share-panel {
+  box-shadow: none;
+  padding: 14px;
+}
+
+label {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.url-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+input {
+  width: 100%;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--soft);
+  color: var(--ink);
+  outline: 0;
+  padding: 0 12px;
+}
+
+.uploader-shell {
+  position: relative;
+  overflow: hidden;
+  box-shadow: none;
+}
+
+iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--soft);
+}
+
+.empty-state {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  background: var(--soft);
+  color: var(--muted);
+  text-align: center;
+}
+
+.empty-state strong {
+  color: var(--ink);
+  font-size: 24px;
+}
+
+pre {
+  min-height: 0;
+  margin: 12px 0 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #141812;
+  color: #d7f6df;
+  padding: 12px;
+  white-space: pre-wrap;
+  font: 12px/1.45 Consolas, "Cascadia Mono", monospace;
+}
+
+@media (max-width: 1060px) {
+  .app {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+
+  .log-panel {
+    display: none;
+  }
+}
