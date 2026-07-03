@@ -63,6 +63,27 @@
             </div>
           </div>
 
+          <div class="download-rule-box">
+            <div>
+              <label for="maxDownloadsSelect">Limite de descargas</label>
+              <select id="maxDownloadsSelect">
+                <option value="0" selected>Ilimitadas</option>
+                <option value="1">1 descarga</option>
+                <option value="3">3 descargas</option>
+                <option value="10">10 descargas</option>
+                <option value="custom">Personalizado</option>
+              </select>
+            </div>
+            <div id="customMaxDownloadsWrap" hidden>
+              <label for="customMaxDownloadsInput">Cantidad</label>
+              <input id="customMaxDownloadsInput" type="number" min="1" step="1" value="1" inputmode="numeric">
+            </div>
+            <label class="check-row" for="deleteAfterLimitInput">
+              <input id="deleteAfterLimitInput" type="checkbox">
+              <span>Borrar al llegar al limite</span>
+            </label>
+          </div>
+
           <div class="actions">
             <button id="chooseButton" class="secondary" type="button">Buscar archivo</button>
             <button id="uploadButton" type="button" disabled>Subir y crear link</button>
@@ -96,7 +117,10 @@
             </div>
             <button id="refreshButton" class="ghost" type="button">Actualizar</button>
           </div>
+          <div id="statsPanel" class="stats-grid"></div>
           <div id="transferList" class="transfer-list"></div>
+          <h3 class="section-title">Historial</h3>
+          <div id="historyList" class="history-list"></div>
           <div id="networkHints" class="network"></div>
         </aside>
       </section>

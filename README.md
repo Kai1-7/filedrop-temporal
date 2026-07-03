@@ -11,7 +11,10 @@ FileDrop Temporal is useful when you occasionally need to send a big APK, ZIP, v
 - Local storage on your PC.
 - Temporary download links.
 - Per-file expiration times.
+- Optional download limits per link.
+- Auto-delete when a link reaches its download limit.
 - Automatic cleanup when links expire.
+- Private stats for active storage, download counts, and recent history.
 - Private upload code.
 - Responsive browser interface.
 - Optional Electron desktop shell.
@@ -71,6 +74,8 @@ Keep the terminal open while your friend downloads. If your PC sleeps, shuts dow
 Each upload can choose its own expiration time from the web UI. The default is 1 hour and the default maximum is 24 hours.
 
 The default max file size is 25 GB. Real transfers still depend on your free disk space, connection speed, and how long your PC stays awake.
+
+The private panel also shows how much temporary space is currently used, available disk space when the OS reports it, active download counts, and recent removed links.
 
 ## Desktop App
 

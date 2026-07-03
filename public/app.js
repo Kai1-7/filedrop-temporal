@@ -5,6 +5,9 @@ const state = {
   info: null,
   selectedFile: null,
   transfers: [],
+  history: [],
+  stats: null,
+  storage: null,
   downloadTransfer: null,
   durationInitialized: false,
 };
@@ -24,6 +27,10 @@ const els = {
   durationSelect: document.querySelector("#durationSelect"),
   customDurationWrap: document.querySelector("#customDurationWrap"),
   customDurationInput: document.querySelector("#customDurationInput"),
+  maxDownloadsSelect: document.querySelector("#maxDownloadsSelect"),
+  customMaxDownloadsWrap: document.querySelector("#customMaxDownloadsWrap"),
+  customMaxDownloadsInput: document.querySelector("#customMaxDownloadsInput"),
+  deleteAfterLimitInput: document.querySelector("#deleteAfterLimitInput"),
   chooseButton: document.querySelector("#chooseButton"),
   uploadButton: document.querySelector("#uploadButton"),
   fileName: document.querySelector("#fileName"),
@@ -38,7 +45,9 @@ const els = {
   resultNote: document.querySelector("#resultNote"),
   uploadStatus: document.querySelector("#uploadStatus"),
   refreshButton: document.querySelector("#refreshButton"),
+  statsPanel: document.querySelector("#statsPanel"),
   transferList: document.querySelector("#transferList"),
+  historyList: document.querySelector("#historyList"),
   networkHints: document.querySelector("#networkHints"),
   downloadTitle: document.querySelector("#downloadTitle"),
   downloadSize: document.querySelector("#downloadSize"),
@@ -61,6 +70,7 @@ async function init() {
     els.adminView.hidden = false;
     setupAdminEvents();
     renderInfo();
+    renderDownloadLimitControls();
     if (state.code) await unlockWithCode(state.code, false);
   }
 
@@ -87,6 +97,8 @@ function setupAdminEvents() {
   els.fileInput.addEventListener("change", () => selectFile(els.fileInput.files[0]));
   els.durationSelect.addEventListener("change", renderDurationControls);
   els.customDurationInput.addEventListener("input", renderDurationControls);
+  els.maxDownloadsSelect.addEventListener("change", renderDownloadLimitControls);
+  els.customMaxDownloadsInput.addEventListener("input", renderDownloadLimitControls);
   els.uploadButton.addEventListener("click", uploadSelectedFile);
   els.refreshButton.addEventListener("click", refreshTransfers);
   els.copyButton.addEventListener("click", () => copyText(els.shareLink.value, els.resultNote));
@@ -163,8 +175,16 @@ function uploadSelectedFile() {
 
   const startedAt = performance.now();
   const ttlMs = getSelectedTtlMs();
+  const maxDownloads = getSelectedMaxDownloads();
   if (!ttlMs) {
     setStatus(els.uploadStatus, "Elige una duracion valida para el link.", true);
+    els.uploadButton.disabled = false;
+    els.chooseButton.disabled = false;
+    els.progressPanel.hidden = true;
+    return;
+  }
+  if (maxDownloads === false) {
+    setStatus(els.uploadStatus, "Elige un limite de descargas valido.", true);
     els.uploadButton.disabled = false;
     els.chooseButton.disabled = false;
     els.progressPanel.hidden = true;
@@ -176,6 +196,8 @@ function uploadSelectedFile() {
   xhr.setRequestHeader("X-Upload-Code", state.code);
   xhr.setRequestHeader("X-File-Name", encodeURIComponent(file.name));
   xhr.setRequestHeader("X-File-Ttl-Ms", String(ttlMs));
+  xhr.setRequestHeader("X-Max-Downloads", String(maxDownloads || 0));
+  xhr.setRequestHeader("X-Delete-After-Max-Downloads", els.deleteAfterLimitInput.checked ? "1" : "0");
   xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
 
   xhr.upload.addEventListener("progress", (event) => {
@@ -224,7 +246,7 @@ function uploadSelectedFile() {
 
 async function refreshTransfers() {
   try {
-    const response = await fetch("/api/transfers", {
+    const response = await fetch("/api/stats", {
       headers: { "X-Upload-Code": state.code },
     });
     if (response.status === 401) {
@@ -236,7 +258,12 @@ async function refreshTransfers() {
     }
     const data = await response.json();
     state.transfers = data.transfers || [];
+    state.history = data.history || [];
+    state.stats = data.summary || null;
+    state.storage = data.storage || null;
+    renderStats();
     renderTransfers();
+    renderHistory();
   } catch {
     els.transferList.innerHTML = `<p class="empty">No se pudieron cargar los links activos.</p>`;
   }
@@ -289,7 +316,8 @@ function renderTransfers() {
         <div class="transfer-meta">
           <span>${formatBytes(transfer.size)}</span>
           <span data-expires="${transfer.expiresAt}">${timeLeft(transfer.expiresAt)}</span>
-          <span>${transfer.downloadCount} descargas</span>
+          <span>${formatDownloadCount(transfer)}</span>
+          <span>${formatLastDownload(transfer.lastDownloadedAt)}</span>
         </div>
         <div class="transfer-actions">
           <a href="${shareUrl}" target="_blank" rel="noreferrer">Abrir</a>
@@ -309,6 +337,50 @@ function renderTransfers() {
       await deleteTransfer(button.dataset.delete);
     });
   });
+}
+
+function renderStats() {
+  if (!state.stats || !state.storage) {
+    els.statsPanel.innerHTML = "";
+    return;
+  }
+
+  els.statsPanel.innerHTML = `
+    <div class="stat-card">
+      <span>Activos</span>
+      <strong>${state.stats.activeCount}</strong>
+    </div>
+    <div class="stat-card">
+      <span>Usado</span>
+      <strong>${formatBytes(state.storage.activeBytes || 0)}</strong>
+    </div>
+    <div class="stat-card">
+      <span>Libre</span>
+      <strong>${state.storage.freeBytes === null ? "N/D" : formatBytes(state.storage.freeBytes)}</strong>
+    </div>
+    <div class="stat-card">
+      <span>Descargas</span>
+      <strong>${state.stats.totalDownloads || 0}</strong>
+    </div>
+  `;
+}
+
+function renderHistory() {
+  if (!state.history.length) {
+    els.historyList.innerHTML = `<p class="empty">Todavia no hay historial.</p>`;
+    return;
+  }
+
+  els.historyList.innerHTML = state.history.slice(0, 8).map((transfer) => `
+    <article class="history-item">
+      <div class="history-title">${escapeHtml(transfer.name)}</div>
+      <div class="transfer-meta">
+        <span>${formatRemovalReason(transfer.removalReason)}</span>
+        <span>${formatDownloadCount(transfer)}</span>
+        <span>${formatRelativeTime(transfer.removedAt)}</span>
+      </div>
+    </article>
+  `).join("");
 }
 
 async function deleteTransfer(id) {
@@ -384,6 +456,14 @@ function renderDurationControls() {
   }
 }
 
+function renderDownloadLimitControls() {
+  const custom = els.maxDownloadsSelect.value === "custom";
+  const unlimited = els.maxDownloadsSelect.value === "0";
+  els.customMaxDownloadsWrap.hidden = !custom;
+  els.deleteAfterLimitInput.disabled = unlimited;
+  if (unlimited) els.deleteAfterLimitInput.checked = false;
+}
+
 function updateTimers() {
   if (state.downloadTransfer) {
     const left = timeLeft(state.downloadTransfer.expiresAt);
@@ -442,6 +522,18 @@ function getSelectedTtlMs() {
   const maxTtl = state.info ? state.info.maxTtlMs : 24 * 60 * 60 * 1000;
   if (ttlMs < minTtl || ttlMs > maxTtl) return null;
   return Math.round(ttlMs);
+}
+
+function getSelectedMaxDownloads() {
+  const rawValue = els.maxDownloadsSelect.value;
+  if (rawValue === "0") return null;
+
+  const maxDownloads = rawValue === "custom"
+    ? Number(els.customMaxDownloadsInput.value)
+    : Number(rawValue);
+
+  if (!Number.isInteger(maxDownloads) || maxDownloads < 1 || maxDownloads > 100000) return false;
+  return maxDownloads;
 }
 
 function isLocalLikeHost(host) {
@@ -504,6 +596,41 @@ function formatDurationLabel(ms) {
   const minutes = totalMinutes % 60;
   const hourText = `${hours} ${hours === 1 ? "hora" : "horas"}`;
   return minutes ? `${hourText} ${minutes} min` : hourText;
+}
+
+function formatDownloadCount(transfer) {
+  const count = Number(transfer.downloadCount) || 0;
+  if (transfer.maxDownloads) return `${count}/${transfer.maxDownloads} descargas`;
+  return `${count} descargas`;
+}
+
+function formatLastDownload(value) {
+  if (!value) return "Sin descargas";
+  return `Ultima: ${formatRelativeTime(value)}`;
+}
+
+function formatRelativeTime(value) {
+  const timestamp = Number(value);
+  if (!timestamp) return "Nunca";
+  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  if (seconds < 10) return "ahora";
+  if (seconds < 60) return `hace ${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `hace ${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `hace ${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `hace ${days}d`;
+}
+
+function formatRemovalReason(reason) {
+  const labels = {
+    expired: "Vencio",
+    manual: "Borrado",
+    "download-limit": "Limite alcanzado",
+    missing: "Archivo faltante",
+  };
+  return labels[reason] || "Cerrado";
 }
 
 function formatBytes(bytes) {

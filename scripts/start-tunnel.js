@@ -116,13 +116,13 @@ async function ensureCloudflared() {
         "Falta instalar Cloudflare Tunnel (cloudflared).",
         "",
         "Opcion facil dentro del proyecto:",
-        "  npm run filedrop:setup-tunnel",
+        "  npm run setup-tunnel",
         "",
         "O instalalo en Windows con:",
         "  winget install --id Cloudflare.cloudflared --source winget",
         "",
         "Despues corre:",
-        "  npm run filedrop:tunnel",
+        "  npm run tunnel",
       ].join("\n")));
     });
     child.on("exit", (codeValue) => {

@@ -14,6 +14,7 @@ const APP_DIR = __dirname;
 const PUBLIC_DIR = path.join(APP_DIR, "public");
 const STORAGE_DIR = path.join(APP_DIR, "storage");
 const DB_PATH = path.join(STORAGE_DIR, "transfers.json");
+const HISTORY_PATH = path.join(STORAGE_DIR, "history.json");
 const CODE_PATH = path.join(APP_DIR, ".upload-code");
 const PUBLIC_ORIGIN_PATH = path.join(APP_DIR, "public-origin.txt");
 
@@ -39,6 +40,7 @@ fs.mkdirSync(STORAGE_DIR, { recursive: true });
 
 const uploadCode = readOrCreateUploadCode();
 const transfers = new Map(loadTransfers().map((transfer) => [transfer.id, transfer]));
+let history = loadHistory();
 
 cleanupExpired().catch((error) => {
   console.warn("No se pudo limpiar archivos vencidos:", error.message);
@@ -99,6 +101,13 @@ const server = http.createServer(async (req, res) => {
           .sort((a, b) => b.uploadedAt - a.uploadedAt)
           .map(publicTransfer),
       });
+      return;
+    }
+
+    if (route === "/api/stats" && req.method === "GET") {
+      if (!requireUploadCode(req, res)) return;
+      await cleanupExpired();
+      sendJson(req, res, 200, await buildStats());
       return;
     }
 
@@ -163,7 +172,7 @@ server.headersTimeout = 80_000;
 
 server.on("error", (error) => {
   if (error.code === "EADDRINUSE") {
-    console.error(`El puerto ${PORT} ya esta ocupado. Prueba con: $env:PORT=8788; npm run filedrop`);
+    console.error(`El puerto ${PORT} ya esta ocupado. Prueba con: $env:PORT=8788; npm start`);
     process.exit(1);
   }
   throw error;
@@ -191,6 +200,15 @@ async function handleUpload(req, res) {
     req.destroy();
     return;
   }
+
+  const maxDownloads = resolveMaxDownloads(req.headers["x-max-downloads"]);
+  if (maxDownloads instanceof Error) {
+    sendJson(req, res, maxDownloads.statusCode || 400, { error: maxDownloads.message });
+    req.destroy();
+    return;
+  }
+
+  const deleteAfterMaxDownloads = maxDownloads !== null && parseBoolean(req.headers["x-delete-after-max-downloads"]);
 
   const contentLength = Number(req.headers["content-length"] || 0);
   if (Number.isFinite(contentLength) && contentLength > MAX_BYTES) {
@@ -243,6 +261,8 @@ async function handleUpload(req, res) {
     uploadedAt: now,
     expiresAt: now + ttlMs,
     ttlMs,
+    maxDownloads,
+    deleteAfterMaxDownloads,
     downloadCount: 0,
     lastDownloadedAt: null,
   };
@@ -274,12 +294,19 @@ async function handleDownload(req, res, id) {
   try {
     stat = await fsp.stat(filePath);
   } catch {
-    await removeTransfer(id);
+    await removeTransfer(id, "missing");
     sendPlain(res, 404, "Archivo no encontrado.");
     return;
   }
 
   const range = parseRange(req.headers.range, stat.size);
+  const shouldCountDownload = req.method !== "HEAD" && (!range || range.start === 0);
+  if (shouldCountDownload && hasReachedDownloadLimit(transfer)) {
+    await removeTransfer(id, "download-limit");
+    sendPlain(res, 410, "Este link ya alcanzo su limite de descargas.");
+    return;
+  }
+
   if (range && range.invalid) {
     res.writeHead(416, {
       "Content-Range": `bytes */${stat.size}`,
@@ -287,6 +314,18 @@ async function handleDownload(req, res, id) {
     });
     res.end();
     return;
+  }
+
+  if (shouldCountDownload) {
+    transfer.downloadCount += 1;
+    transfer.lastDownloadedAt = Date.now();
+    saveTransfers().catch(() => {});
+
+    if (transfer.deleteAfterMaxDownloads && hasReachedDownloadLimit(transfer)) {
+      res.once("finish", () => {
+        removeTransfer(id, "download-limit").catch(() => {});
+      });
+    }
   }
 
   const headers = {
@@ -315,11 +354,6 @@ async function handleDownload(req, res, id) {
     fs.createReadStream(filePath).pipe(res);
   }
 
-  if (req.method !== "HEAD") {
-    transfer.downloadCount += 1;
-    transfer.lastDownloadedAt = Date.now();
-    saveTransfers().catch(() => {});
-  }
 }
 
 function parseRange(rangeHeader, size) {
@@ -352,7 +386,7 @@ async function findActiveTransfer(id) {
   const transfer = transfers.get(id);
   if (!transfer) return null;
   if (Date.now() >= transfer.expiresAt) {
-    await removeTransfer(id);
+    await removeTransfer(id, "expired");
     return "expired";
   }
   return transfer;
@@ -364,17 +398,16 @@ async function cleanupExpired() {
   if (!expired.length) return;
 
   for (const transfer of expired) {
-    transfers.delete(transfer.id);
-    await fsp.rm(path.join(STORAGE_DIR, transfer.storedName), { force: true });
+    await removeTransfer(transfer.id, "expired");
   }
-  await saveTransfers();
 }
 
-async function removeTransfer(id) {
+async function removeTransfer(id, reason = "manual") {
   const transfer = transfers.get(id);
   if (!transfer) return false;
   transfers.delete(id);
   await fsp.rm(path.join(STORAGE_DIR, transfer.storedName), { force: true });
+  await archiveTransfer(transfer, reason);
   await saveTransfers();
   return true;
 }
@@ -390,11 +423,41 @@ function loadTransfers() {
   }
 }
 
+function loadHistory() {
+  try {
+    const raw = fs.readFileSync(HISTORY_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item) => item && item.id);
+  } catch {
+    return [];
+  }
+}
+
 async function saveTransfers() {
   const records = [...transfers.values()].sort((a, b) => b.uploadedAt - a.uploadedAt);
   const tempPath = `${DB_PATH}.tmp`;
   await fsp.writeFile(tempPath, `${JSON.stringify(records, null, 2)}\n`, "utf8");
   await fsp.rename(tempPath, DB_PATH);
+}
+
+async function saveHistory() {
+  history = history
+    .sort((a, b) => (b.removedAt || 0) - (a.removedAt || 0))
+    .slice(0, 500);
+  const tempPath = `${HISTORY_PATH}.tmp`;
+  await fsp.writeFile(tempPath, `${JSON.stringify(history, null, 2)}\n`, "utf8");
+  await fsp.rename(tempPath, HISTORY_PATH);
+}
+
+async function archiveTransfer(transfer, reason) {
+  history = history.filter((item) => item.id !== transfer.id);
+  history.unshift({
+    ...publicTransfer(transfer),
+    removedAt: Date.now(),
+    removalReason: reason,
+  });
+  await saveHistory();
 }
 
 function publicTransfer(transfer) {
@@ -406,9 +469,51 @@ function publicTransfer(transfer) {
     uploadedAt: transfer.uploadedAt,
     expiresAt: transfer.expiresAt,
     ttlMs: transfer.ttlMs || Math.max(0, transfer.expiresAt - transfer.uploadedAt),
+    maxDownloads: transfer.maxDownloads ?? null,
+    deleteAfterMaxDownloads: Boolean(transfer.deleteAfterMaxDownloads),
     downloadCount: transfer.downloadCount || 0,
     lastDownloadedAt: transfer.lastDownloadedAt || null,
   };
+}
+
+async function buildStats() {
+  const activeTransfers = [...transfers.values()].sort((a, b) => b.uploadedAt - a.uploadedAt);
+  const activeBytes = activeTransfers.reduce((sum, transfer) => sum + (Number(transfer.size) || 0), 0);
+  const activeDownloads = activeTransfers.reduce((sum, transfer) => sum + (Number(transfer.downloadCount) || 0), 0);
+  const historyDownloads = history.reduce((sum, transfer) => sum + (Number(transfer.downloadCount) || 0), 0);
+  const lastDownloadedAt = [...activeTransfers, ...history]
+    .map((transfer) => Number(transfer.lastDownloadedAt) || 0)
+    .filter(Boolean)
+    .sort((a, b) => b - a)[0] || null;
+
+  return {
+    summary: {
+      activeCount: activeTransfers.length,
+      activeBytes,
+      totalDownloads: activeDownloads + historyDownloads,
+      historyCount: history.length,
+      lastDownloadedAt,
+    },
+    storage: await getStorageStats(activeBytes),
+    transfers: activeTransfers.map(publicTransfer),
+    history: history.slice(0, 50),
+  };
+}
+
+async function getStorageStats(activeBytes) {
+  const stats = {
+    activeBytes,
+    freeBytes: null,
+    totalBytes: null,
+  };
+
+  try {
+    const stat = await fsp.statfs(STORAGE_DIR);
+    stats.freeBytes = Number(stat.bavail) * Number(stat.bsize);
+    stats.totalBytes = Number(stat.blocks) * Number(stat.bsize);
+  } catch {}
+
+  return stats;
 }
 
 function resolveUploadTtl(value) {
@@ -436,9 +541,30 @@ function resolveUploadTtl(value) {
   return Math.round(ttlMs);
 }
 
+function resolveMaxDownloads(value) {
+  if (value === undefined || value === null || value === "" || value === "0") return null;
+
+  const maxDownloads = Number(value);
+  if (!Number.isInteger(maxDownloads) || maxDownloads < 1 || maxDownloads > 100000) {
+    const error = new Error("El limite de descargas no es valido.");
+    error.statusCode = 400;
+    return error;
+  }
+
+  return maxDownloads;
+}
+
 function clampTtl(value) {
   if (!Number.isFinite(value)) return 60 * 60 * 1000;
   return Math.max(MIN_TTL_MS, Math.min(Math.round(value), MAX_TTL_MS));
+}
+
+function hasReachedDownloadLimit(transfer) {
+  return Number.isInteger(transfer.maxDownloads) && transfer.downloadCount >= transfer.maxDownloads;
+}
+
+function parseBoolean(value) {
+  return ["1", "true", "yes", "si", "on"].includes(String(value || "").trim().toLowerCase());
 }
 
 function requireUploadCode(req, res) {
